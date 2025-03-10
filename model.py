@@ -169,42 +169,34 @@ class LightDenoisingAutoencoder(nn.Module):
             nn.Dropout2d(dropout_rate)
         )
         
-        # Pooling layers
-        self.pool = nn.MaxPool2d(2)
-        
         # Residual blocks
         self.res1 = LightResidualBlock(16)
         self.res2 = LightResidualBlock(32)
         
         # Decoder
         self.dec1 = nn.Sequential(
-            nn.ConvTranspose2d(32, 16, kernel_size=2, stride=2),
+            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(16),
             nn.ReLU(inplace=True),
             nn.Dropout2d(dropout_rate)
         )
         self.dec2 = nn.Sequential(
-            nn.ConvTranspose2d(16, 1, kernel_size=2, stride=2),
-            nn.Sigmoid()  # Ensure output is in [0,1]
+            nn.ConvTranspose2d(16, 1, kernel_size=3, stride=1, padding=1)
         )
         
     def forward(self, x):
-        # Encoder with intermediate outputs for skip connections
+        # Encoder
         e1 = self.enc1(x)
         e1 = self.res1(e1)
-        p1 = self.pool(e1)
         
-        e2 = self.enc2(p1)
+        e2 = self.enc2(e1)
         e2 = self.res2(e2)
-        p2 = self.pool(e2)
         
-        # Decoder with skip connections
-        d1 = self.dec1(p2)
-        d1 = torch.add(d1, p1)  # Skip connection with pooled features
-        
+        # Decoder
+        d1 = self.dec1(e2)
         d2 = self.dec2(d1)
         
-        return d2
+        return torch.sigmoid(d2)
     
     def _initialize_weights(self):
         for m in self.modules():
